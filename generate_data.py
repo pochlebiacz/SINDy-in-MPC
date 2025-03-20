@@ -9,7 +9,7 @@ with open('params.json', 'r') as f:
     hiv_params = json.load(f)["hiv"]
 
 
-def population(t, state, u=0):
+def population(t, state, T=None, u=0):
     """
     Parameters:
     - t: time (unused but included for compatibility with ODE solvers)
@@ -24,10 +24,12 @@ def population(t, state, u=0):
     b = population_params["b"]
     c = population_params["c"]
     d = population_params["d"]
-
-    dx1 = a * x1 - b * x1 * x2
-    dx2 = -c * x2 + d * x1* x2 + u
-    
+    if T is None:
+        dx1 = a * x1 + b * x1 * x2
+        dx2 = c * x2 + d * x1* x2 + u
+    else:
+        dx1 = T * (a * x1 + b * x1 * x2) + x1
+        dx2 = T * (c * x2 + d * x1* x2 + u) + x2
     return [dx1, dx2]
 
 
@@ -41,6 +43,21 @@ def generate_population_data(t, x0, u=None):
         x = solve_ivp(lambda t, y: population(t=t, state=y), (t[0], t[-1]), x0, t_eval=t, method='LSODA').y.T
         x_dot = np.array([population(time_step, state) for time_step, state in zip(t, x)])
     return x, x_dot
+
+
+def generate_discrete_population_data(t, x0, u=None, T=1):
+    assert len(x0) == 2
+    xk = [x0]
+    
+    if u is not None:
+        for i in range(len(t)-1):
+            x0 = population(t=t, state=x0, u=u[i], T=T)
+            xk.append(x0)
+    else:
+        for i in range(len(t)-1):
+            x0 = population(t=t, state=x0, T=T)
+            xk.append(x0)
+    return np.array(xk)
 
 
 def tracking(t, state, u=0):
