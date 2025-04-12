@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.integrate import solve_ivp
 from decimal import Decimal
+import matplotlib.pyplot as plt
 from pysindy.feature_library import PolynomialLibrary, FourierLibrary
 import pysindy as ps
 import json
@@ -192,60 +193,12 @@ def generate_discrete_hiv_data(t, x0, u=None, T=1):
     return np.array(xk)
 
 
-def get_tables(libs, t, x, x_val, x0, x0_val, x_dot, u, u_val, T=1, discrete_time=False):
-    for x_num in range(len(x0)):
-        q = 'Biblioteka funkcji & Próg & $\Dot{x}'
-        print(f'{q}_{x_num+1}$ & $E_{x_num+1}$ \\\\')
-        for i, library in enumerate(libs):
-            print(f'\\hline')
-            for threshold in range(3):
-                threshold = 10**(threshold-10) if i >= 2 else 100*10**(threshold-10)
-                threshold = T * threshold if discrete_time else threshold
-                name = ['Trygonometryczna (st. 2)', 'Trygonometryczna (st. 1)', 'Wielomiany (st. 3)', 'Wielomiany (st. 2)', 'Liniowa']
-                model = ps.SINDy(
-                    feature_library=library,
-                    optimizer=ps.STLSQ(threshold=threshold),
-                    feature_names=[f'x{i+1}' for i in range(len(x0))]+['u'],
-                    discrete_time=discrete_time
-                    )
-                if discrete_time:
-                    model.fit(x=x, u=u(t))
-                else:
-                    model.fit(x=x, x_dot=x_dot, u=u(t))
-                try:
-                    if discrete_time:
-                        x_sim = model.simulate(x0=x0_val, t=len(t)+1, u=u_val(t))
-                    else:
-                        x_sim = model.simulate(x0=x0_val, t=t, u=u_val)
-                    mse = ((x_sim - x_val)**2).mean(axis=0)
-                    E = '%.3E' % Decimal(str(mse[x_num]))
-                except:
-                    E = '\infty'
-                coeffs = ' + '.join(['%.3E' % Decimal(str(coeff))+' '+model.get_feature_names()[i] for i, coeff in enumerate(model.coefficients()[x_num]) if abs(model.coefficients()[x_num][i]) > threshold])
-                if len(coeffs.split(' + ')) > 2:
-                    eq = (coeffs.split(' + ')[0] + ' + ' + coeffs.split(' + ')[1] + '\dots').replace(' 1 +', ' +')
-                else:
-                    eq = coeffs
-                if len(coeffs) == 0:
-                    eq = '0,000'
-                eq = eq.replace(' 1 +', ' +').replace('.', ',').replace('+ -', '- ').replace('sin', '\sin').replace('cos', '\cos').replace('(1 x1)', '(x_1)').replace('(1 x2)', '(x_2)').replace('x2', 'x_2').replace('(1 x3)', '(x_3)').replace('x3', 'x_3').replace('x1', 'x_1').replace('(1 u)', '(u)')
-                thr = '%.0E' % Decimal(str(threshold))
-                for pow in range(1, 10):
-                    eq = eq.replace('E+00', '')
-                    E = E.replace('E+00', '')
-                    eq = eq.replace(f'E+0{pow}', f'\cdot 10^{pow}').replace(f'E-0{pow}', '\cdot 10^{'+f'{-pow}'+'}')
-                    E = E.replace(f'E+0{pow}', f'\cdot 10^{pow}').replace(f'E-0{pow}', '\cdot 10^{'+f'{-pow}'+'}')
-                    thr = thr.replace(f'1E+0{pow}', f'10^{pow}').replace(f'1E-0{pow}', '10^{'+f'{-pow}'+'}')
-                print(f"{name[i]} & ${thr}$ & ${eq}$ & ${E.replace('.', ',')}$ \\\\")
-        print('\n\n')
-
-
 def get_reference_population(x0):
     x = np.zeros((100, 2))
 
     x[0:5, 0] = x0[0]
-    x[5:20, 0] = 60
-    x[20:60, 0] = 40
+    x[5:30, 0] = 60
+    x[30:60, 0] = 40
     x[60:80, 0] = 20
     x[80:100, 0] = 50
 
@@ -258,7 +211,8 @@ def get_reference_population(x0):
     return x
 
 
-def get_population_model(x0, Ts=0.1, thr=1e-4, deg=2):
+def get_population_model(Ts=0.1, thr=1e-4, deg=2):
+    x0 = [50, 50]
     t = np.linspace(0, 100, int(100/Ts)+1)
     u = lambda t : np.sin(t)
 
@@ -275,3 +229,175 @@ def get_population_model(x0, Ts=0.1, thr=1e-4, deg=2):
     model.print(precision=int(3 - np.log10(Ts)))
 
     return model
+
+
+def get_reference_tracking(x0):
+    x = np.zeros((100, 3))
+
+    x[0:5, 0] = x0[0]
+    x[5:20, 0] = -0.1
+    x[20:60, 0] = 0.2
+    x[60:80, 0] = 0.1
+    x[80:100, 0] = -0.2
+
+    x[0:5, 1] = x0[1]
+    x[5:30, 1] = 0.1
+    x[30:50, 1] = 0.3
+    x[50:100, 1] = 0.2
+    x[80:100, 1] = 0.4
+
+    x[0:5, 2] = x0[2]
+    x[5:30, 2] = 0.2
+    x[30:50, 2] = 0.0
+    x[50:100, 2] = -0.1
+    x[80:100, 2] = 0.1
+
+    return x
+
+
+def get_tracking_model(Ts=0.1, thr=1e-5, deg=3):
+    x0 = [-0.1, 0.2, -0.1]
+    t = np.linspace(0, 20, int(20/Ts)+1)
+    u = lambda t : 0.001*np.sin(t)
+
+    xk = generate_discrete_tracking_data(t, x0, T=Ts, u=u(t))
+
+    model = ps.SINDy(
+        feature_library=PolynomialLibrary(degree=deg),
+        # feature_library=FourierLibrary(n_frequencies=2),
+        optimizer=ps.STLSQ(threshold=thr),
+        feature_names=[f'x{i+1}' for i in range(len(x0))]+['u'],
+        discrete_time=True)
+    
+    model.fit(x=xk, u=u(t))
+    model.print(precision=int(3 - np.log10(Ts)))
+
+    return model
+
+
+def get_reference_hiv(x0):
+    x = np.zeros((100, 5))
+
+    x[0:5, 0] = x0[0]
+    x[5:20, 0] = 1
+    x[20:60, 0] = 3
+    x[60:80, 0] = 2
+    x[80:100, 0] = 1
+
+    x[0:5, 1] = x0[1]
+    x[5:30, 1] = 2
+    x[30:50, 1] = 0.5
+    x[50:100, 1] = 1
+    x[80:100, 1] = 3
+
+    x[0:5, 2] = x0[2]
+    x[5:30, 2] = 1.2
+    x[30:50, 2] = 1.5
+    x[50:100, 2] = 1.3
+    x[80:100, 2] = 0.8
+
+    x[0:5, 3] = x0[3]
+    x[5:30, 3] = -0.87
+    x[30:50, 3] = -0.82
+    x[50:100, 3] = -0.85
+    x[80:100, 3] = -0.84
+
+    x[0:5, 4] = x0[4]
+    x[5:30, 4] = 1.1
+    x[30:50, 4] = 1.3
+    x[50:100, 4] = 1.2
+    x[80:100, 4] = 0.8
+
+    return x
+
+
+def get_hiv_model(Ts=0.1, thr=1e-4, deg=3):
+    x0 = [1, 1, 1, 1, 1]
+    t = np.linspace(0, 100, int(100/Ts)+1)
+    u = lambda t : 0.1*np.sin(t)
+
+    xk = generate_discrete_hiv_data(t, x0=x0, T=Ts, u=u(t))
+
+    model = ps.SINDy(
+        feature_library=PolynomialLibrary(degree=deg),
+        # feature_library=FourierLibrary(n_frequencies=2),
+        optimizer=ps.STLSQ(threshold=thr),
+        feature_names=[f'x{i+1}' for i in range(len(x0))]+['u'],
+        discrete_time=True)
+    
+    model.fit(x=xk, u=u(t))
+    model.print(precision=int(3 - np.log10(Ts)))
+
+    return model
+
+
+def linearize(model, x, u, eps=1e-6):
+    x = np.array(x, dtype=float)
+    u = float(u)
+    nx = len(x)
+
+    f0 = model.simulate(x, t=2, u=np.array([u]))[-1]
+    A = np.zeros((nx, nx))
+    B = np.zeros((nx, 1))
+
+    for i in range(nx):
+        dx = np.zeros(nx)
+        dx[i] = eps
+        xp = model.simulate(x+dx, t=2, u=np.array([u]))[-1]
+        A[:, i] = (xp - f0) / eps
+
+    up = model.simulate(x, t=2, u=np.array([u+eps]))[-1]
+    B[:, 0] = (up - f0) / eps
+
+    return A, B
+
+
+def plot(y_zad, x, u, w, save=False):
+    fig, axs = plt.subplots(len(x[0]), 1, figsize=(10, 2.4*len(x[0])))
+    if len(x[0]) == 2:
+        axs[0].set_title("Liczba osobników")
+        axs[0].set_ylabel("Populacja ofiar")
+        axs[1].set_ylabel("Populacja drapieżników")
+        axs[-1].set_xlabel("Czas [dni]")
+        process = 1
+    elif len(x[0]) == 3:
+        axs[0].set_title("Parametry lotu")
+        axs[0].set_ylabel("Kąt natarcia")
+        axs[1].set_ylabel("Kąt nachylenia")
+        axs[2].set_ylabel("Współczynnik nachylenia")
+        axs[-1].set_xlabel("Czas [s]")
+        process = 2
+    else:
+        axs[0].set_title("Stężenie komórek")
+        axs[0].set_ylabel("Zdrowe CD4+")
+        axs[1].set_ylabel("Zainfekowane CD4+")
+        axs[2].set_ylabel("Prekursory LTC")
+        axs[3].set_ylabel("Pomocniczo-niezależne LTC")
+        axs[4].set_ylabel("Pomocniczo-zależne LTC")
+        axs[-1].set_xlabel("Czas [dni]")
+        process = 3
+    kmax = len(y_zad)
+
+    for i in range(len(x[0])):
+        axs[i].step(range(kmax), y_zad[:, i], label=f"$x_{i+1}^{{zad}}$", color=f"C{i*2}")
+        axs[i].step(range(kmax), x[0:kmax, i], label=f"$x_{i+1}$", color=f"C{i*2+1}")
+        axs[i].legend()
+        axs[i].grid()
+    plt.tight_layout()
+    plt.show()
+
+    if save:
+        fig.savefig(f"imgs/MPC_NO proces-{process} w={w}.png", dpi=300, bbox_inches='tight')
+    
+    plt.step(range(kmax-1), u[0:kmax-1])
+    if process in [1, 3]:
+        plt.xlabel("Czas [dni]")
+    else:
+        plt.xlabel("Czas [s]")
+    plt.ylabel("Sterowanie")
+    plt.grid()
+    plt.title("Sterowanie")
+
+    if save:
+        plt.savefig(f"imgs/MPC_NO proces-{process} w={w} ster.png", dpi=300, bbox_inches='tight')
+    plt.show()
