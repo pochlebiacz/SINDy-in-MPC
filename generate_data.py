@@ -235,8 +235,8 @@ def get_reference_tracking(x0):
     x = np.zeros((200, 3))
 
     x[0:10, 0] = x0[0]
-    x[10:40, 0] = -0.1
-    x[40:120, 0] = 0.2
+    x[10:60, 0] = -0.1
+    x[60:120, 0] = 0.2
     x[120:160, 0] = 0.1
     x[160:200, 0] = -0.2
 
@@ -379,7 +379,8 @@ def plot(y_zad, x, u, w, save=False):
     kmax = len(y_zad)
 
     for i in range(len(x[0])):
-        axs[i].step(range(kmax), y_zad[:, i], label=f"$x_{i+1}^{{zad}}$", color=f"C{i*2}")
+        if w[i] > 0:
+            axs[i].step(range(kmax), y_zad[:, i], label=f"$x_{i+1}^{{zad}}$", color=f"C{i*2}")
         axs[i].step(range(kmax), x[0:kmax, i], label=f"$x_{i+1}$", color=f"C{i*2+1}")
         axs[i].legend()
         axs[i].grid()
@@ -387,7 +388,7 @@ def plot(y_zad, x, u, w, save=False):
     plt.show()
 
     if save:
-        fig.savefig(f"imgs/MPC_NO proces-{process} w={w}.png", dpi=300, bbox_inches='tight')
+        fig.savefig(f"experiments/MPC_NO proces-{process} w={w}.png", dpi=300, bbox_inches='tight')
     
     plt.step(range(kmax-1), u[0:kmax-1])
     if process in [1, 3]:
@@ -399,5 +400,43 @@ def plot(y_zad, x, u, w, save=False):
     plt.title("Sterowanie")
 
     if save:
-        plt.savefig(f"imgs/MPC_NO proces-{process} w={w} ster.png", dpi=300, bbox_inches='tight')
+        plt.savefig(f"experiments/MPC_NO proces-{process} w={w} ster.png", dpi=300, bbox_inches='tight')
     plt.show()
+
+
+def initialize(process, N, Nu, Ts):
+    if process == 1:
+        x0 = [50, 20]
+        y_zad = get_reference_population(x0)
+        fun = population
+        u = 5 * np.ones(len(y_zad)+Nu+N)
+        bds = 100
+        model = get_population_model(Ts, thr=1e-4, deg=2)
+    elif process == 2:
+        x0 = [0, 0, 0]
+        y_zad = get_reference_tracking(x0)
+        fun = tracking
+        u = np.zeros(len(y_zad)+Nu+N)
+        bds = 0.01
+        model = get_tracking_model(Ts, thr=1e-5, deg=3)
+    else:
+        x05_stable = 0.05
+        x0 = [11/20, 10/3, x05_stable, 0.0835-x05_stable, x05_stable]
+        y_zad = get_reference_hiv(x0)
+        fun = hiv
+        u = 533/1078 * np.ones(len(y_zad)+Nu+N)
+        bds = 2
+        model = get_hiv_model(Ts, thr=1e-4, deg=3)
+
+    x = np.zeros((len(y_zad)+N, len(x0)))
+    x[0:5, :] = x0
+
+    return y_zad, fun, x, u, bds, model
+
+    # 1. Stable initial condition: x1 = 5*x2-10*u, np. x, u = [(50, 20), 5]
+
+def A_sum(A, n):
+    result = np.zeros(A.shape)
+    for i in range(n+1):
+        result += np.linalg.matrix_power(A, i)
+    return result
