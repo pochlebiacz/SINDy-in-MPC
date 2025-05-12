@@ -111,14 +111,16 @@ def plot(y_zad, x, u, w, save=False):
     for i in range(len(x[0])):
         if w[i] > 0:
             axs[i].step(range(kmax), y_zad[:, i], label=f"$x_{i+1}^{{zad}}$", color=f"C{i*2}")
-        axs[i].step(range(kmax), x[0:kmax, i], label=f"$x_{i+1}$", color=f"C{i*2+1}")
+            axs[i].step(range(kmax), x[0:kmax, i], label=f"$x_{i+1}$", color=f"C{i*2+1}", linestyle='--')
+        else:
+            axs[i].step(range(kmax), x[0:kmax, i], label=f"$x_{i+1}$", color=f"C{i*2+1}")
         axs[i].legend()
         axs[i].grid()
     plt.tight_layout()
     plt.show()
 
     if save:
-        fig.savefig(f"experiments/MPC_NO proces-{process} w={w}.png", dpi=300, bbox_inches='tight')
+        fig.savefig(f"experiments/MPC_NO proces-{process} w={w}.pdf", bbox_inches='tight')
     
     plt.step(range(kmax-1), u[0:kmax-1])
     if process in [1, 3]:
@@ -130,11 +132,11 @@ def plot(y_zad, x, u, w, save=False):
     plt.title("Sterowanie")
 
     if save:
-        plt.savefig(f"experiments/MPC_NO proces-{process} w={w} ster.png", dpi=300, bbox_inches='tight')
+        plt.savefig(f"experiments/MPC_NO proces-{process} w={w} ster.pdf", bbox_inches='tight')
     plt.show()
 
 
-def initialize(process, N, Nu, Ts):
+def initialize(process, N, Nu, Ts, est='good'):
     if process == 1:
         x0 = [50, 20]
         y_zad = get_reference_population(x0)
@@ -142,6 +144,10 @@ def initialize(process, N, Nu, Ts):
         u = 5 * np.ones(len(y_zad)+Nu+N)
         bds = 100
         model = get_population_model(Ts, thr=1e-4, deg=2)
+        if est == 'bad':
+            model.coefficients()[1][3] += 0.1
+        elif est == 'mid':
+            model.coefficients()[1][3] += 0.05
     elif process == 2:
         x0 = [0, 0, 0]
         y_zad = get_reference_tracking(x0)
@@ -149,14 +155,22 @@ def initialize(process, N, Nu, Ts):
         u = np.zeros(len(y_zad)+Nu+N)
         bds = 0.01
         model = get_tracking_model(Ts, thr=1e-5, deg=3)
+        if est == 'bad':
+            model.coefficients()[1][3] += 0.001
+        elif est == 'mid':
+            model.coefficients()[1][3] += 0.0005
     else:
         x05_stable = 0.05
         x0 = [11/20, 10/3, x05_stable, 0.0835-x05_stable, x05_stable]
         y_zad = get_reference_hiv(x0)
         fun = hiv
         u = 533/1078 * np.ones(len(y_zad)+Nu+N)
-        bds = 2
+        bds = 1
         model = get_hiv_model(Ts, thr=1e-4, deg=3)
+        if est == 'bad':
+            model.coefficients()[1][6] += 0.002
+        elif est == 'mid':
+            model.coefficients()[1][6] += 0.001
 
     x = np.zeros((len(y_zad)+N, len(x0)))
     x[0:5, :] = x0

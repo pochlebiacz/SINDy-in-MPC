@@ -1,16 +1,5 @@
 import numpy as np
 from scipy.integrate import solve_ivp
-from decimal import Decimal
-import matplotlib.pyplot as plt
-from pysindy.feature_library import PolynomialLibrary, FourierLibrary
-import pysindy as ps
-import json
-
-with open('params.json', 'r') as f:
-    population_params = json.load(f)["population"]
-
-with open('params.json', 'r') as f:
-    hiv_params = json.load(f)["hiv"]
 
 
 def population(t, state, T=None, u=0):
@@ -22,6 +11,7 @@ def population(t, state, T=None, u=0):
     Returns:
     - derivatives: list of [dx1/dt, dx2/dt]
     """
+    population_params = {"a": 0.5, "b": -0.025, "c": -0.5, "d": 0.005}
     x1, x2 = state # x1 = prey, x2 = predator
 
     a = population_params["a"]
@@ -135,6 +125,8 @@ def hiv(t, state, T=None, u=0):
     Returns:
     - derivatives: list of [dx1/dt, dx2/dt, dx3/dt, dx4/dt, dx5/dt]
     """
+    hiv_params = {"lambda": 1, "d": 0.1, "beta": 1, "eta": 0.9799, "a": 0.2, "p1": 1, "p2": 1, 
+            "c1": 0.03, "c2": 0.06, "q": 0.5, "b1": 0.1, "b2": 0.01, "h": 0.1}
     x1, x2, x3, x4, x5 = state # x1 = healthy CD4+ T cells, x2 = HIV-infected CD4+ T cells, 
                                # x3 = CLT precursors, x4 = helper-independent CTLs, x5 = helper-dependent CTLs
     λ = hiv_params["lambda"]
