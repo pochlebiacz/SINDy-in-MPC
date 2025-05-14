@@ -25,22 +25,29 @@ def get_population_model(Ts=0.1, thr=1e-4, deg=2):
 
 
 def get_tracking_model(Ts=0.1, thr=1e-5, deg=3):
-    x0 = [-0.1, 0.2, -0.1]
     t = np.linspace(0, 20, int(20/Ts)+1)
-    u = lambda t : 0.001*np.sin(t)
 
-    xk = generate_discrete_tracking_data(t, x0, T=Ts, u=u(t))
+    x0s = np.random.uniform(-0.1, 0.1, (500, 3))
+
+    xss = []
+    us = []
+
+    for x0 in x0s:
+        u = lambda t: x0[0] / 100. * np.sin(t)
+        x = generate_discrete_tracking_data(t=t, x0=x0, T=Ts, u=u(t))
+        xss.append(x)
+        us.append(u(t))
 
     model = ps.SINDy(
         feature_library=PolynomialLibrary(degree=deg),
-        # feature_library=FourierLibrary(n_frequencies=2),
         optimizer=ps.STLSQ(threshold=thr),
         feature_names=[f'x{i+1}' for i in range(len(x0))]+['u'],
         discrete_time=True)
     
-    model.fit(x=xk, u=u(t))
-
+    model.fit(x=xss, u=us, multiple_trajectories=True)
+    
     return model
+
 
 def get_hiv_model(Ts=0.1, thr=1e-4, deg=3):
     x0 = [1, 1, 1, 1, 1]
@@ -153,12 +160,12 @@ def initialize(process, N, Nu, Ts, est='good'):
         y_zad = get_reference_tracking(x0)
         fun = tracking
         u = np.zeros(len(y_zad)+Nu+N)
-        bds = 0.01
-        model = get_tracking_model(Ts, thr=1e-5, deg=3)
+        bds = 0.002
+        model = get_tracking_model(Ts, thr=1e-9, deg=3)
         if est == 'bad':
-            model.coefficients()[1][3] += 0.001
+            model.coefficients()[0][3] += 0.05
         elif est == 'mid':
-            model.coefficients()[1][3] += 0.0005
+            model.coefficients()[0][3] += 0.025
     else:
         x05_stable = 0.05
         x0 = [11/20, 10/3, x05_stable, 0.0835-x05_stable, x05_stable]
@@ -168,14 +175,14 @@ def initialize(process, N, Nu, Ts, est='good'):
         bds = 1
         model = get_hiv_model(Ts, thr=1e-4, deg=3)
         if est == 'bad':
-            model.coefficients()[1][6] += 0.002
+            model.coefficients()[1][6] += 0.02
         elif est == 'mid':
-            model.coefficients()[1][6] += 0.001
+            model.coefficients()[1][6] += 0.01
 
     x = np.zeros((len(y_zad)+N, len(x0)))
     x[0:5, :] = x0
 
-    return y_zad, fun, x, u, bds, model
+    return y_zad, fun, x, u, x.copy(), u.copy(), bds, model
 
     # 1. Stable initial condition: x1 = 5*x2-10*u, np. x, u = [(50, 20), 5]
 
