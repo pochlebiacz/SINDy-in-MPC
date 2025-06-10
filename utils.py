@@ -149,18 +149,21 @@ def initialize(process, N, Nu, Ts, est='good'):
         y_zad = get_reference_population(x0)
         fun = population
         u = 5 * np.ones(len(y_zad)+Nu+N)
-        bds = 100
+        bds = 20
+        umax = 100
         model = get_population_model(Ts, thr=1e-4, deg=2)
         if est == 'bad':
             model.coefficients()[1][3] += 0.1
         elif est == 'mid':
             model.coefficients()[1][3] += 0.05
+
     elif process == 2:
         x0 = [0, 0, 0]
         y_zad = get_reference_tracking(x0)
         fun = tracking
         u = np.zeros(len(y_zad)+Nu+N)
         bds = 0.002
+        umax = 0.05
         model = get_tracking_model(Ts, thr=1e-9, deg=3)
         if est == 'bad':
             model.coefficients()[0][3] += 0.05
@@ -173,6 +176,7 @@ def initialize(process, N, Nu, Ts, est='good'):
         fun = hiv
         u = 533/1078 * np.ones(len(y_zad)+Nu+N)
         bds = 1
+        umax = 5
         model = get_hiv_model(Ts, thr=1e-4, deg=3)
         if est == 'bad':
             model.coefficients()[1][6] += 0.02
@@ -182,7 +186,7 @@ def initialize(process, N, Nu, Ts, est='good'):
     x = np.zeros((len(y_zad)+N, len(x0)))
     x[0:5, :] = x0
 
-    return y_zad, fun, x, u, x.copy(), u.copy(), bds, model
+    return y_zad, fun, x, u, x.copy(), u.copy(), bds, umax, model
 
     # 1. Stable initial condition: x1 = 5*x2-10*u, np. x, u = [(50, 20), 5]
 

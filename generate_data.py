@@ -45,7 +45,7 @@ def generate_discrete_population_data(t, x0, u=None, T=1):
     
     if u is not None:
         for i in range(len(t)-1):
-            x0 = population(t=t, state=x0, u=u[i], T=T)
+            x0 = population(t=t, state=x0, T=T, u=u[i])
             xk.append(x0)
     else:
         for i in range(len(t)-1):
